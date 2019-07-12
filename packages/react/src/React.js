@@ -61,11 +61,14 @@ const React = {
     only,
   },
 
+  // React 未来即将抛弃 <div ref="myDiv" />这种string ref的用法，可以使用这个 api 来给组件生成 ref
   createRef,
   Component,
   PureComponent,
 
+  // 新版定稿的 contest 方案，React 17 大版本中会移除老的 contest API
   createContext,
+  // 高阶组件传递 ref 使用
   forwardRef,
   lazy,
   memo,

@@ -378,6 +378,8 @@ export function jsxWithValidationDynamic(type, props, key) {
 }
 
 export function createElementWithValidation(type, props, children) {
+  // 第一步：校验类型，是不是 react 认识的类型，如果不是得话就，给出提示，但是后续的逻辑还会走
+  console.log('validation1', Array.from(arguments))
   const validType = isValidElementType(type);
 
   // We warn in this case but don't throw. We expect the element creation to
@@ -425,6 +427,7 @@ export function createElementWithValidation(type, props, children) {
     );
   }
 
+  // 第二步：创建节点元素
   const element = createElement.apply(this, arguments);
 
   // The result can be nullish if a mock or a custom function is used.

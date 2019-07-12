@@ -37,8 +37,10 @@ type BaseFiberRootProperties = {|
   // Any additional information from the host associated with this root.
   containerInfo: any,
   // Used only by persistent updates.
+  // 服务端渲染用到
   pendingChildren: any,
   // The currently active root fiber. This is the mutable root of the tree.
+  // 对应的 Fiber  对象，是 Fiber tree 的顶点
   current: Fiber,
 
   pingCache:
@@ -53,6 +55,7 @@ type BaseFiberRootProperties = {|
   // it's superseded by a new one.
   timeoutHandle: TimeoutHandle | NoTimeout,
   // Top context object, used by renderSubtreeIntoContainer
+  // 顶层 context 对象，只有调用 renderSubtreeIntoContainer 时才会有用，
   context: Object | null,
   pendingContext: Object | null,
   // Determines if we should attempt to hydrate on the initial mount
@@ -124,6 +127,7 @@ export function createFiberRoot(
   tag: RootTag,
   hydrate: boolean,
 ): FiberRoot {
+  console.log('开始创建 FiberRoot', Array.from(arguments))
   const root: FiberRoot = (new FiberRootNode(containerInfo, tag, hydrate): any);
 
   // Cyclic construction. This cheats the type system right now because

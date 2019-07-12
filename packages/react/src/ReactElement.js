@@ -307,8 +307,10 @@ export function createElement(type, config, children) {
   // Reserved names are extracted
   const props = {};
 
+  // key 和 ref 如果有的话就赋值
   let key = null;
   let ref = null;
+  // self 和 source 字段作为保留的，必须有值，可以为null
   let self = null;
   let source = null;
 
@@ -323,6 +325,7 @@ export function createElement(type, config, children) {
     self = config.__self === undefined ? null : config.__self;
     source = config.__source === undefined ? null : config.__source;
     // Remaining properties are added to a new props object
+    // 其他除了保留属性的 属性，都放入 props
     for (propName in config) {
       if (
         hasOwnProperty.call(config, propName) &&
@@ -335,6 +338,8 @@ export function createElement(type, config, children) {
 
   // Children can be more than one argument, and those are transferred onto
   // the newly allocated props object.
+  // 获取 children 节点，构造了一个数组，作为 props.children
+  console.log('获取 children 节点，构造了一个数组，作为 props.children')
   const childrenLength = arguments.length - 2;
   if (childrenLength === 1) {
     props.children = children;
@@ -352,6 +357,7 @@ export function createElement(type, config, children) {
   }
 
   // Resolve default props
+  console.log('如果当前类型的element 有默认属性，并且没有赋值的情况，需要赋上默认值')
   if (type && type.defaultProps) {
     const defaultProps = type.defaultProps;
     for (propName in defaultProps) {
@@ -374,6 +380,22 @@ export function createElement(type, config, children) {
       }
     }
   }
+  console.log('type', type)
+  console.log('key', key)
+  console.log('type,\n' +
+    '    key,\n' +
+    '    ref,\n' +
+    '    self,\n' +
+    '    source,\n' +
+    '    ReactCurrentOwner.current,\n' +
+    '    props,', type,
+    key,
+    ref,
+    self,
+    source,
+    ReactCurrentOwner.current,
+    props,)
+
   return ReactElement(
     type,
     key,

@@ -136,7 +136,7 @@ export type Fiber = {|
 
   // The Fiber to return to after finishing processing this one.
   // This is effectively the parent, but there can be multiple parents (two)
-  // so this is only the parent of the thing we're currently processing.
+  // so this is only the parent of he thing we're currently processing.
   // It is conceptually the same as the return address of a stack frame.
   return: Fiber | null,
 
@@ -234,7 +234,7 @@ let debugCounter;
 if (__DEV__) {
   debugCounter = 1;
 }
-
+// Fiber 节点构造函数
 function FiberNode(
   tag: WorkTag,
   pendingProps: mixed,
@@ -242,40 +242,64 @@ function FiberNode(
   mode: TypeOfMode,
 ) {
   // Instance
+  // 标记不同的组件类型
   this.tag = tag;
+  // ReactElement 里面的 key
   this.key = key;
+  // ReactElement.type，createElement 的第一个参数
   this.elementType = null;
+  // 异步组件 resolved 之后的内容，一般是 function 或者 class
   this.type = null;
+  // 跟当前 Fiber 相关本地状态，浏览器环境对应的是 DOM 节点； functional com 是没有这个实例的
   this.stateNode = null;
 
   // Fiber
+  // 指向他在Fiber节点树中的`parent`，用来在处理完这个节点之后向上返回
   this.return = null;
+  // 指向第一个子节点
   this.child = null;
+  // 指向自己的兄弟节点
   this.sibling = null;
   this.index = 0;
 
   this.ref = null;
 
+  // 新的变动带来的新的props
   this.pendingProps = pendingProps;
+  // 上一次渲染之后的 props
   this.memoizedProps = null;
+  // 该Fiber对应的组件产生的Update会存放在这个队列里面
   this.updateQueue = null;
+  // 上一次渲染的时候的state
   this.memoizedState = null;
+
   this.contextDependencies = null;
 
   this.mode = mode;
 
   // Effects
+  // 用来记录Side Effect
   this.effectTag = NoEffect;
+  // 单链表用来快速查找下一个side effect
   this.nextEffect = null;
 
+  // 子树中第一个side effect
   this.firstEffect = null;
+  // 子树中最后一个side effect
   this.lastEffect = null;
 
+  // 代表任务在未来的哪个时间点应该被完成
+  // 不包括他的子树产生的任务
   this.expirationTime = NoWork;
+  // 快速确定子树中是否有不在等待的变化
   this.childExpirationTime = NoWork;
 
+  // 在Fiber树更新的过程中，每个Fiber都会有一个跟其对应的Fiber
+  // 我们称他为`current <==> workInProgress`
+  // 在渲染完成之后他们会交换位置
   this.alternate = null;
 
+  // 下面是调试相关的，收集每个Fiber和子树渲染时间的
   if (enableProfilerTimer) {
     // Note: The following is done to avoid a v8 performance cliff.
     //
@@ -460,6 +484,7 @@ export function createWorkInProgress(
   return workInProgress;
 }
 
+// TODO: 这个 mode 有啥用？ 计算过期时间的时候用到的
 export function createHostRootFiber(tag: RootTag): Fiber {
   let mode;
   if (tag === ConcurrentRoot) {
@@ -476,6 +501,7 @@ export function createHostRootFiber(tag: RootTag): Fiber {
     // Without some nodes in the tree having empty base times.
     mode |= ProfileMode;
   }
+  console.log(`createHostRootFiber 根节点，HostRoot ${HostRoot}, mode= ${mode}`)
 
   return createFiber(HostRoot, null, null, mode);
 }

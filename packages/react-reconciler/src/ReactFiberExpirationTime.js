@@ -31,6 +31,7 @@ const MAGIC_NUMBER_OFFSET = Batched - 1;
 // 1 unit of expiration time represents 10ms.
 export function msToExpirationTime(ms: number): ExpirationTime {
   // Always add an offset so that we don't clash with the magic number for NoWork.
+  // 忽略 10 ms 以内差别； offset 可以忽略不计，后面还会再加回来，是为了避免和 NoWork 魔法数字冲突
   return MAGIC_NUMBER_OFFSET - ((ms / UNIT_SIZE) | 0);
 }
 
@@ -38,6 +39,7 @@ export function expirationTimeToMs(expirationTime: ExpirationTime): number {
   return (MAGIC_NUMBER_OFFSET - expirationTime) * UNIT_SIZE;
 }
 
+// 取整计算，最后忽略 时间精度范围内的差别，这里是 250 / 10, 25 ms
 function ceiling(num: number, precision: number): number {
   return (((num / precision) | 0) + 1) * precision;
 }
@@ -50,6 +52,7 @@ function computeExpirationBucket(
   return (
     MAGIC_NUMBER_OFFSET -
     ceiling(
+      // 这里的时间就加回来了，所以 offset 可以忽略不计
       MAGIC_NUMBER_OFFSET - currentTime + expirationInMs / UNIT_SIZE,
       bucketSizeMs / UNIT_SIZE,
     )
@@ -59,8 +62,11 @@ function computeExpirationBucket(
 // TODO: This corresponds to Scheduler's NormalPriority, not LowPriority. Update
 // the names to reflect.
 export const LOW_PRIORITY_EXPIRATION = 5000;
+
+// 低优先级的任务 更新时间间隔
 export const LOW_PRIORITY_BATCH_SIZE = 250;
 
+// 异步任务的过期时间（低优先级），与 suspense 的不同是
 export function computeAsyncExpiration(
   currentTime: ExpirationTime,
 ): ExpirationTime {
@@ -71,6 +77,8 @@ export function computeAsyncExpiration(
   );
 }
 
+
+// 计算有 suspense 的过期时间
 export function computeSuspenseExpiration(
   currentTime: ExpirationTime,
   timeoutMs: number,
@@ -106,6 +114,7 @@ export const HIGH_PRIORITY_EXPIRATION = __DEV__ ? 500 : 150;
 export const HIGH_PRIORITY_BATCH_SIZE = 100;
 
 export function computeInteractiveExpiration(currentTime: ExpirationTime) {
+  // 这里看到，高优先级的，过期时间比 suspense 的要小（更早执行）：1. 传入的过期时间小了 2.计算的时候，忽略的时间差别小了（更精确了）
   return computeExpirationBucket(
     currentTime,
     HIGH_PRIORITY_EXPIRATION,

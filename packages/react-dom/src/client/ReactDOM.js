@@ -368,7 +368,9 @@ function ReactSyncRoot(
   hydrate: boolean,
 ) {
   // Tag is either LegacyRoot or Concurrent Root
+  console.log('创建跟节点，tag: ' + tag )
   const root = createContainer(container, tag, hydrate);
+  console.log('返回的是 fiberRoot', root)
   this._internalRoot = root;
 }
 
@@ -469,7 +471,7 @@ function getReactRootElementInContainer(container: any) {
     return container.firstChild;
   }
 }
-
+// 如果有子节点，并且初始化过（通过根据节点是否有 data-reactroot 属性来判断是否经过服务端渲染），就需要同构
 function shouldHydrateDueToLegacyHeuristic(container) {
   const rootElement = getReactRootElementInContainer(container);
   return !!(
@@ -494,6 +496,7 @@ function legacyCreateRootFromDOMContainer(
   const shouldHydrate =
     forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
   // First clear any existing content.
+  console.log('如果不需要同构，就清除容器里的所有子节点')
   if (!shouldHydrate) {
     let warned = false;
     let rootSibling;
@@ -548,13 +551,17 @@ function legacyRenderSubtreeIntoContainer(
   // member of intersection type." Whyyyyyy.
   let root: _ReactSyncRoot = (container._reactRootContainer: any);
   let fiberRoot;
+  console.log('第一次挂载')
   if (!root) {
     // Initial mount
+    console.log('第一次 挂载，创建 root')
     root = container._reactRootContainer = legacyCreateRootFromDOMContainer(
       container,
       forceHydrate,
     );
+    console.log('当前 root', root)
     fiberRoot = root._internalRoot;
+    console.log('当前 fiberRoot', fiberRoot)
     if (typeof callback === 'function') {
       const originalCallback = callback;
       callback = function() {
@@ -563,6 +570,7 @@ function legacyRenderSubtreeIntoContainer(
       };
     }
     // Initial mount should not be batched.
+    // TODO：更新的过程：第一次，不是批量更新
     unbatchedUpdates(() => {
       updateContainer(children, fiberRoot, parentComponent, callback);
     });
@@ -671,6 +679,9 @@ const ReactDOM: Object = {
         enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot',
       );
     }
+    console.log('第二大步 渲染 根：')
+    console.log('render element tree', element)
+    console.log('render container', container)
     return legacyRenderSubtreeIntoContainer(
       null,
       element,

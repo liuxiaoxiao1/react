@@ -107,6 +107,7 @@ import {markRenderEventTimeAndConfig} from './ReactFiberScheduler';
 import invariant from 'shared/invariant';
 import warningWithoutStack from 'shared/warningWithoutStack';
 
+// update 对象
 export type Update<State> = {
   expirationTime: ExpirationTime,
   suspenseConfig: null | SuspenseConfig,
@@ -210,6 +211,7 @@ export function createUpdate(
   };
 }
 
+// 将更新 添加到队列里面
 function appendUpdateToQueue<State>(
   queue: UpdateQueue<State>,
   update: Update<State>,
@@ -229,12 +231,24 @@ export function enqueueUpdate<State>(fiber: Fiber, update: Update<State>) {
   const alternate = fiber.alternate;
   let queue1;
   let queue2;
+  console.log('enqueueUpdate 1', fiber);
+  console.log('enqueueUpdate alternate', alternate);
+  // TODO: 需要确定哪些情况下，只有一个队列
+
+  // 初次进来应该是 null
+  // TODO: 需要看 alternate 是在哪里更改的
   if (alternate === null) {
     // There's only one fiber.
     queue1 = fiber.updateQueue;
     queue2 = null;
     if (queue1 === null) {
+      // 初次生成更新队列
+      console.log('fiber.memoizedState', fiber.memoizedState)
+      // 基于 state，使用对象包装了一下，
+      // TODO: 返回的是一个数组？？
+      console.log('生成 Update queue')
       queue1 = fiber.updateQueue = createUpdateQueue(fiber.memoizedState);
+      console.log('typeof queue1', typeof queue1)
     }
   } else {
     // There are two owners.

@@ -56,7 +56,7 @@ import {
   flushInteractiveUpdates,
   flushPassiveEffects,
 } from './ReactFiberScheduler';
-import {createUpdate, enqueueUpdate} from './ReactUpdateQueue';
+import {createUpdate, enqueueUpdate, UpdateState} from './ReactUpdateQueue';
 import ReactFiberInstrumentation from './ReactFiberInstrumentation';
 import {
   getStackByFiberInDevAndProd,
@@ -68,6 +68,7 @@ import {Sync} from './ReactFiberExpirationTime';
 import {revertPassiveEffectsChange} from 'shared/ReactFeatureFlags';
 import {requestCurrentSuspenseConfig} from './ReactFiberSuspenseConfig';
 import {scheduleHotUpdate} from './ReactFiberHotReloading';
+import {createHostRootFiber} from "./ReactFiber";
 
 type OpaqueRoot = FiberRoot;
 
@@ -141,6 +142,14 @@ function scheduleRootUpdate(
     }
   }
 
+  // 创建更新，只是用对象包装了一下，加了一些额外的字段，
+  //     tag: UpdateState,
+  //     payload: null,
+  //     callback: null,
+  //
+  //     next: null,
+  //     nextEffect: null,
+
   const update = createUpdate(expirationTime, suspenseConfig);
   // Caution: React DevTools currently depends on this property
   // being called "element".
@@ -157,10 +166,17 @@ function scheduleRootUpdate(
     update.callback = callback;
   }
 
+  // TODO：具体还不清楚作用，是回滚操作么
   if (revertPassiveEffectsChange) {
     flushPassiveEffects();
   }
+  //
+  console.log('will enqueueUpdate, current', current)
+  console.log('will enqueueUpdate, update', update)
+  // 添加到更新队列，queue1, queue2
+  // 放到更新队列
   enqueueUpdate(current, update);
+  // 执行更新，开始更新调度，按照优先级进行
   scheduleWork(current, expirationTime);
 
   return expirationTime;
@@ -175,6 +191,7 @@ export function updateContainerAtExpirationTime(
   callback: ?Function,
 ) {
   // TODO: If this is a nested container, this won't be the root.
+  // rootFiber 对象，还有别的么。。。看后面代码再定
   const current = container.current;
 
   if (__DEV__) {
@@ -189,13 +206,17 @@ export function updateContainerAtExpirationTime(
     }
   }
 
+  // 目前是空的
   const context = getContextForSubtree(parentComponent);
+  console.log('update, context', context)
   if (container.context === null) {
     container.context = context;
   } else {
     container.pendingContext = context;
   }
 
+
+  // TODO：执行更新任务
   return scheduleRootUpdate(
     current,
     element,
@@ -286,6 +307,7 @@ function findHostInstanceWithWarning(
   return findHostInstance(component);
 }
 
+// TODO：创建 FiberRoot
 export function createContainer(
   containerInfo: Container,
   tag: RootTag,
@@ -300,19 +322,30 @@ export function updateContainer(
   parentComponent: ?React$Component<any, any>,
   callback: ?Function,
 ): ExpirationTime {
+  // 这个 current  是前面生成的 HostRootFiber
   const current = container.current;
+  // 计算当前任务 时间！！
   const currentTime = requestCurrentTime();
   const suspenseConfig = requestCurrentSuspenseConfig();
+  // 根据当前时间，当前的 fiber 对象，suspenseConfig  来计算过期时间
+  // TODO: 这个非常重要！！
   const expirationTime = computeExpirationForFiber(
     currentTime,
     current,
     suspenseConfig,
   );
+  console.log('updateContainer expirationTime', expirationTime)
+  // TODO：下面是执行更新
   return updateContainerAtExpirationTime(
+    // 所有节点
     element,
+    // fiberRoot
     container,
+    // 父级，render 的时候是 null
     parentComponent,
+    // 过期时间
     expirationTime,
+    // suspense 配置
     suspenseConfig,
     callback,
   );

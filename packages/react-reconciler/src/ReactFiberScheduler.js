@@ -249,7 +249,10 @@ let interruptedBy: Fiber | null = null;
 // receive the same expiration time. Otherwise we get tearing.
 let currentEventTime: ExpirationTime = NoWork;
 
+// TODO: 计算过期时间
 export function requestCurrentTime() {
+  // 如果是在执行 react 代码; 使用的是 performance.now (加载完代码到当前代码的时间间隔)，做了兼容，如果没有的话用的是 Date
+  console.log('开始计算过期时间', now())
   if (workPhase === RenderPhase || workPhase === CommitPhase) {
     // We're inside React, so it's fine to read the actual time.
     return msToExpirationTime(now());
@@ -264,29 +267,48 @@ export function requestCurrentTime() {
   return currentEventTime;
 }
 
+/**
+ * 计算过期时间
+ * @param currentTime
+ * @param fiber
+ * @param suspenseConfig
+ * @return {*}
+ */
 export function computeExpirationForFiber(
   currentTime: ExpirationTime,
   fiber: Fiber,
   suspenseConfig: null | SuspenseConfig,
 ): ExpirationTime {
   const mode = fiber.mode;
+  console.log('fiber mode', mode)
+  console.log('BatchedMode', BatchedMode)
+  console.log('mode & BatchedMode', mode & BatchedMode)
   if ((mode & BatchedMode) === NoMode) {
     return Sync;
   }
 
+  // 获取 当前 scheduler 的优先级，目前是直接获取的： 99 - 95， 90
+  // TODO：看看后面是哪个地方设置的优先级
   const priorityLevel = getCurrentPriorityLevel();
+  console.log('cur priorityLevel', priorityLevel)
   if ((mode & ConcurrentMode) === NoMode) {
     return priorityLevel === ImmediatePriority ? Sync : Batched;
   }
 
   if (workPhase === RenderPhase) {
     // Use whatever time we're already rendering
+    // 如果 是 rendering，返回 0
     return renderExpirationTime;
   }
 
   let expirationTime;
+  // 如果有 suspense 的话，基于 suspense 去计算过期时间
+  // 否则，是基于优先级来计算过期时间
   if (suspenseConfig !== null) {
     // Compute an expiration time based on the Suspense timeout.
+    // 如果有 suspense 的配置，就需要基于 timeout 的时间来计算。
+    // TODO: 如果配置的时间，小于 5000 ms 怎么办？？，是不是优先级比正常的要高了？？，
+    // TODO: 如果小于 150 是不是比 UserBlocking 的任务优先级还高？
     expirationTime = computeSuspenseExpiration(
       currentTime,
       suspenseConfig.timeoutMs | 0 || LOW_PRIORITY_EXPIRATION,
@@ -294,16 +316,21 @@ export function computeExpirationForFiber(
   } else {
     // Compute an expiration time based on the Scheduler priority.
     switch (priorityLevel) {
+      // 立即执行的，同步，是 Math.pow(2, 30) - 1； v8 32 位，最大的整数
+      // TODO: 要看下 数字越大级别越高？
       case ImmediatePriority:
         expirationTime = Sync;
         break;
+        // TODO：用户阻塞，比如：用户的输入，鼠标事件
       case UserBlockingPriority:
         // TODO: Rename this to computeUserBlockingExpiration
+        // 使用的时间是 150 ms，忽略时间差是 100 / 10 ms： 事件的通常都在这个里面
         expirationTime = computeInteractiveExpiration(currentTime);
         break;
       case NormalPriority:
       case LowPriority: // TODO: Handle LowPriority
         // TODO: Rename this to... something better.
+        // 低优先级的，是有可能同 suspense 的同优先级的：使用的时间是 5000 ms，忽略时间差是 250 / 10 ms,
         expirationTime = computeAsyncExpiration(currentTime);
         break;
       case IdlePriority:
@@ -316,8 +343,10 @@ export function computeExpirationForFiber(
 
   // If we're in the middle of rendering a tree, do not update at the same
   // expiration time that is already rendering.
+  // 如果正在渲染，就不要在同一时间更新了，放在下一个更新里
   if (workInProgressRoot !== null && expirationTime === renderExpirationTime) {
     // This is a trick to move this update into a separate batch
+    // 错开了当前正在执行的更新
     expirationTime -= 1;
   }
 
@@ -338,22 +367,29 @@ export function computeUniqueAsyncExpiration(): ExpirationTime {
   return result;
 }
 
+// TODO: 执行更新 Fiber
 export function scheduleUpdateOnFiber(
   fiber: Fiber,
   expirationTime: ExpirationTime,
 ) {
+  // 防止 nestedUpdateCount 超过 50，避免出现无限循环
   checkForNestedUpdates();
+  // dev 代码
   warnAboutInvalidUpdatesOnClassComponentsInDEV(fiber);
 
+  // 从 Fiber 开始，一直往上到 root  更新 过期时间
   const root = markUpdateTimeFromFiberToRoot(fiber, expirationTime);
   if (root === null) {
     warnAboutUpdateOnUnmountedFiberInDEV(fiber);
     return;
   }
 
+  // suspense 的使用的
   root.pingTime = NoWork;
 
+  // 检查是不是打断的任务，如果是的话，记录是被谁打断的
   checkForInterruption(fiber, expirationTime);
+  // TODO 看到这里了。。。。
   recordScheduleUpdate();
 
   if (expirationTime === Sync) {
@@ -407,8 +443,10 @@ export const scheduleWork = scheduleUpdateOnFiber;
 // work without treating it as a typical update that originates from an event;
 // e.g. retrying a Suspense boundary isn't an update, but it does schedule work
 // on a fiber.
+// 从当前 Fiber 节点更新过期时间，一直到 root 结束
 function markUpdateTimeFromFiberToRoot(fiber, expirationTime) {
   // Update the source fiber's expiration time
+  // 先更新自己的过期时间，然后再更新子节点的过期时间
   if (fiber.expirationTime < expirationTime) {
     fiber.expirationTime = expirationTime;
   }
@@ -417,11 +455,13 @@ function markUpdateTimeFromFiberToRoot(fiber, expirationTime) {
     alternate.expirationTime = expirationTime;
   }
   // Walk the parent path to the root and update the child expiration time.
+  console.log('markUpdateTimeFromFiberToRoot fiber', fiber.return)
   let node = fiber.return;
   let root = null;
   if (node === null && fiber.tag === HostRoot) {
     root = fiber.stateNode;
   } else {
+    // 递归更新自己所有的父级节点
     while (node !== null) {
       alternate = node.alternate;
       if (node.childExpirationTime < expirationTime) {
@@ -474,6 +514,7 @@ function scheduleCallbackForRoot(
   priorityLevel: ReactPriorityLevel,
   expirationTime: ExpirationTime,
 ) {
+  console.log('root.callbackExpirationTime', root.callbackExpirationTime)
   const existingCallbackExpirationTime = root.callbackExpirationTime;
   if (existingCallbackExpirationTime < expirationTime) {
     // New callback has higher priority than the existing one.
@@ -1087,6 +1128,7 @@ function performUnitOfWork(unitOfWork: Fiber): Fiber | null {
   let next;
   if (enableProfilerTimer && (unitOfWork.mode & ProfileMode) !== NoMode) {
     startProfilerTimer(unitOfWork);
+    // 每个节点的更新
     next = beginWork(current, unitOfWork, renderExpirationTime);
     stopProfilerTimerIfRunningAndRecordDelta(unitOfWork, true);
   } else {

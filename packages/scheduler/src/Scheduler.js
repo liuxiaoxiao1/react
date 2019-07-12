@@ -54,7 +54,9 @@ var isPerformingWork = false;
 
 var isHostCallbackScheduled = false;
 
+// firstCallbackNode 节点更新的时候才会调用
 function scheduleHostCallbackIfNeeded() {
+  // 如果已经启动调度了 就不用再次启动了： TODO：应该是一个循环，其实在回调里(flushWork) 最后还会执行
   if (isPerformingWork) {
     // Don't schedule work yet; wait until the next time we yield.
     return;
@@ -78,11 +80,13 @@ function flushFirstCallback() {
   // Remove the node from the list before calling the callback. That way the
   // list is in a consistent state even if the callback throws.
   var next = firstCallbackNode.next;
+  // 只有一个节点
   if (firstCallbackNode === next) {
     // This is the last callback in the list.
     firstCallbackNode = null;
     next = null;
   } else {
+    // 去掉了第一个节点，然后设置第二个节点为新的 firstCallbackNode
     var lastCallbackNode = firstCallbackNode.previous;
     firstCallbackNode = lastCallbackNode.next = next;
     next.previous = lastCallbackNode;
@@ -174,6 +178,7 @@ function flushWork(didUserCallbackTimeout) {
   const previousDidTimeout = currentHostCallbackDidTimeout;
   currentHostCallbackDidTimeout = didUserCallbackTimeout;
   try {
+    // 有过期的任务
     if (didUserCallbackTimeout) {
       // Flush all the expired callbacks without yielding.
       while (
@@ -184,6 +189,7 @@ function flushWork(didUserCallbackTimeout) {
         // Read the current time. Flush all the callbacks that expire at or
         // earlier than that time. Then read the current time again and repeat.
         // This optimizes for as few performance.now calls as possible.
+        // 将所有已经过期的任务执行掉，直到第一个不过期的任务为止
         var currentTime = getCurrentTime();
         if (firstCallbackNode.expirationTime <= currentTime) {
           do {
@@ -205,6 +211,8 @@ function flushWork(didUserCallbackTimeout) {
             break;
           }
           flushFirstCallback();
+          // shouldYieldToHost() : frameDeadline <= getCurrentTime();
+          // 当前帧截止时间已经过期的情况下，!() 就是不过期的时候执行，代表着当前帧还有剩余时间
         } while (firstCallbackNode !== null && !shouldYieldToHost());
       }
     }
@@ -304,6 +312,7 @@ function unstable_scheduleCallback(
   callback,
   deprecated_options,
 ) {
+  // 可以简单的理解为 就是 now()，为 -1 的情况基本上没用到
   var startTime =
     currentEventStartTime !== -1 ? currentEventStartTime : getCurrentTime();
 
@@ -369,9 +378,12 @@ function unstable_scheduleCallback(
     } else if (next === firstCallbackNode) {
       // The new callback has the earliest expiration in the entire list.
       firstCallbackNode = newNode;
+      // firstCallbackNode
       scheduleHostCallbackIfNeeded();
     }
 
+    // 这里完成插入节点操作，原来的队列是个环形链表，其实就无所谓是插在队尾还是队列，反正是插入在 原来的 next 节点之前；
+    // 只不过是 firstCallbackNode 会有所不同
     var previous = next.previous;
     previous.next = next.previous = newNode;
     newNode.next = next;
